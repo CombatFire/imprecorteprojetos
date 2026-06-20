@@ -187,7 +187,7 @@
       text-decoration: none;
     }
     #app .dl.show { display: block; }
-    #app footer { text-align: center; font-size: 11px; color: #aaa2 92; margin-top: 18px; }
+    #app footer { text-align: center; font-size: 11px; color: #aaa292; margin-top: 18px; }
   </style>
 
   <h1>Divisor de plantas para impressão em mosaico</h1>
@@ -205,6 +205,9 @@
   <div class="step" id="cropStep" style="display:none">
     <h2><span class="num">2</span>Selecione a área a imprimir</h2>
     <div class="hint" style="margin-bottom:8px">Clique e arraste sobre o desenho para marcar só a parte que você quer. Se não selecionar nada, a página inteira é usada.</div>
+    <div class="row" style="margin-bottom:8px">
+      <button class="pill" id="touchSelBtn">👆 Ativar seleção por toque (celular)</button>
+    </div>
     <div id="cropWrap" style="position:relative; border:1px solid var(--line); border-radius:6px; overflow:hidden; line-height:0; cursor:crosshair;">
       <canvas id="previewCanvas"></canvas>
       <div id="selBox" style="position:absolute; border:2px solid var(--accent); background:rgba(181,80,47,0.15); display:none; pointer-events:none;"></div>
@@ -236,12 +239,12 @@
     </div>
     <div class="row" style="margin-top:10px">
       <div class="fieldwrap">
-        <label class="field">Largura final (cm)</label>
-        <input type="number" id="finalW" value="59.4" step="0.1" />
+        <label class="field" for="finalW">Largura final (cm)</label>
+        <input type="number" id="finalW" value="59.4" step="0.1" min="0.1" />
       </div>
       <div class="fieldwrap">
-        <label class="field">Altura final (cm)</label>
-        <input type="number" id="finalH" value="84.1" step="0.1" />
+        <label class="field" for="finalH">Altura final (cm)</label>
+        <input type="number" id="finalH" value="84.1" step="0.1" min="0.1" />
       </div>
     </div>
     <div class="hint">A planta será ampliada mantendo a proporção, centralizada dentro desse tamanho.</div>
@@ -251,7 +254,7 @@
     <h2><span class="num">4</span>Papel da impressora</h2>
     <div class="row">
       <div class="fieldwrap">
-        <label class="field">Tamanho do papel</label>
+        <label class="field" for="paperSize">Tamanho do papel</label>
         <select id="paperSize">
           <option value="210x297">A4 (210 × 297 mm)</option>
           <option value="297x420">A3 (297 × 420 mm)</option>
@@ -266,11 +269,19 @@
         </div>
       </div>
       <div class="fieldwrap">
-        <label class="field">Sobreposição entre folhas</label>
+        <label class="field" for="overlap">Sobreposição entre folhas</label>
         <div class="slider-row">
-          <input type="range" id="overlap" min="5" max="25" value="10" />
+          <input type="range" id="overlap" min="5" max="60" value="10" />
           <span class="slider-val" id="overlapVal">10 mm</span>
         </div>
+      </div>
+      <div class="fieldwrap">
+        <label class="field" for="margin">Margem mínima da folha</label>
+        <div class="slider-row">
+          <input type="range" id="margin" min="0" max="10" step="0.1" value="1.5" />
+          <span class="slider-val" id="marginVal">1.5 mm</span>
+        </div>
+        <div class="hint" style="margin-top:4px">Espaço reservado nas bordas para as marcas de registro. Quanto menor, mais a planta aproveita a folha.</div>
       </div>
     </div>
     <div class="row" style="margin-top:4px">
@@ -287,11 +298,11 @@
         </div>
         <div id="gridCustomRow" style="display:none; gap:10px">
           <div class="fieldwrap">
-            <label class="field">Colunas</label>
+            <label class="field" for="gridCols">Colunas</label>
             <input type="number" id="gridCols" value="2" min="1" max="20" />
           </div>
           <div class="fieldwrap">
-            <label class="field">Linhas</label>
+            <label class="field" for="gridRows">Linhas</label>
             <input type="number" id="gridRows" value="2" min="1" max="20" />
           </div>
         </div>
@@ -299,7 +310,7 @@
     </div>
     <div class="row">
       <div class="fieldwrap">
-        <label class="field">Qualidade (DPI)</label>
+        <label class="field" for="dpi">Qualidade (DPI)</label>
         <div class="slider-row">
           <input type="range" id="dpi" min="100" max="300" step="25" value="250" />
           <span class="slider-val" id="dpiVal">250</span>
@@ -393,6 +404,7 @@
     pdfFile = file;
     drop.classList.add('has-file');
     q('#dropLabel').textContent = '✓ ' + file.name;
+    try {
     const buf = await file.arrayBuffer();
     pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
     const page = await pdfDoc.getPage(1);
@@ -406,7 +418,7 @@
     const detectCanvas = document.createElement('canvas');
     detectCanvas.width = Math.round(dvp.width);
     detectCanvas.height = Math.round(dvp.height);
-    const dctx = detectCanvas.getContext('2d');
+    const dctx = detectCanvas.getContext('2d', { willReadFrequently: true });
     dctx.fillStyle = '#ffffff';
     dctx.fillRect(0, 0, detectCanvas.width, detectCanvas.height);
     await page.render({ canvasContext: dctx, viewport: dvp }).promise;
@@ -436,6 +448,14 @@
     cropStep.style.display = 'block';
     updateSummary();
     q('#goBtn').disabled = false;
+    } catch (err) {
+      console.error('Erro ao processar PDF:', err);
+      fileInfo.textContent = 'Não foi possível abrir esse PDF. Verifique se o arquivo não está corrompido ou protegido por senha.';
+      drop.classList.remove('has-file');
+      q('#dropLabel').textContent = 'Clique ou arraste o PDF aqui';
+      q('#goBtn').disabled = true;
+      pdfDoc = null;
+    }
   }
 
   async function renderPreview(page) {
@@ -451,29 +471,45 @@
   }
 
   let dragging = false, dragStart = null;
-  q('#cropWrap').addEventListener('mousedown', e => {
+  let touchSelectMode = false;
+
+  const touchSelBtn = q('#touchSelBtn');
+  const cropWrapEl = q('#cropWrap');
+  touchSelBtn.addEventListener('click', () => {
+    touchSelectMode = !touchSelectMode;
+    touchSelBtn.classList.toggle('active', touchSelectMode);
+    touchSelBtn.textContent = touchSelectMode
+      ? '✓ Seleção ativa — arraste o dedo para marcar'
+      : '👆 Ativar seleção por toque (celular)';
+    // Só bloqueia o scroll da página quando o modo está ativo
+    cropWrapEl.style.touchAction = touchSelectMode ? 'none' : 'auto';
+  });
+
+  function selStart(clientX, clientY) {
     const rect = previewCanvas.getBoundingClientRect();
-    dragStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    dragStart = { x: clientX - rect.left, y: clientY - rect.top };
     dragging = true;
     selBox.style.display = 'block';
     selBox.style.left = dragStart.x + 'px';
     selBox.style.top = dragStart.y + 'px';
     selBox.style.width = '0px';
     selBox.style.height = '0px';
-  });
-  window.addEventListener('mousemove', e => {
+  }
+
+  function selMove(clientX, clientY) {
     if (!dragging) return;
     const rect = previewCanvas.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-    const y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    const y = Math.max(0, Math.min(clientY - rect.top, rect.height));
     const left = Math.min(x, dragStart.x), top = Math.min(y, dragStart.y);
     const w = Math.abs(x - dragStart.x), h = Math.abs(y - dragStart.y);
     selBox.style.left = left + 'px';
     selBox.style.top = top + 'px';
     selBox.style.width = w + 'px';
     selBox.style.height = h + 'px';
-  });
-  window.addEventListener('mouseup', e => {
+  }
+
+  function selEnd() {
     if (!dragging) return;
     dragging = false;
     const rect = previewCanvas.getBoundingClientRect();
@@ -492,7 +528,31 @@
     selFrac = { x0, y0, x1, y1 };
     selInfo.textContent = `Área selecionada: ${(x1-x0)*100|0}% × ${(y1-y0)*100|0}% da página.`;
     updateSummary();
-  });
+  }
+
+  // Mouse (desktop)
+  q('#cropWrap').addEventListener('mousedown', e => selStart(e.clientX, e.clientY));
+  window.addEventListener('mousemove', e => selMove(e.clientX, e.clientY));
+  window.addEventListener('mouseup', () => selEnd());
+
+  // Toque (celular/tablet) — só atua quando o "modo seleção" está ativo,
+  // para não conflitar com o scroll normal da página.
+  q('#cropWrap').addEventListener('touchstart', e => {
+    if (!touchSelectMode || e.touches.length !== 1) return;
+    e.preventDefault();
+    selStart(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: false });
+  q('#cropWrap').addEventListener('touchmove', e => {
+    if (!touchSelectMode || !dragging || e.touches.length !== 1) return;
+    e.preventDefault();
+    selMove(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: false });
+  q('#cropWrap').addEventListener('touchend', e => {
+    if (!touchSelectMode) return;
+    e.preventDefault();
+    selEnd();
+  }, { passive: false });
+  q('#cropWrap').addEventListener('touchcancel', () => { dragging = false; });
 
   q('#resetSel').addEventListener('click', () => {
     selFrac = null;
@@ -564,6 +624,11 @@
     q('#overlapVal').textContent = overlapSlider.value + ' mm';
     updateSummary();
   });
+  const marginSlider = q('#margin');
+  marginSlider.addEventListener('input', () => {
+    q('#marginVal').textContent = parseFloat(marginSlider.value).toFixed(1) + ' mm';
+    updateSummary();
+  });
   const dpiSlider = q('#dpi');
   dpiSlider.addEventListener('input', () => {
     q('#dpiVal').textContent = dpiSlider.value;
@@ -619,7 +684,7 @@
     else { const tmp = pw; pw = Math.min(pw,ph); ph = Math.max(tmp,ph); }
     const overlapMM = parseFloat(overlapSlider.value);
     const dpi = parseInt(dpiSlider.value);
-    const marginMM = 1.5; // margem mínima para marcas de alinhamento
+    const marginMM = parseFloat(marginSlider.value); // agora ajustável pelo usuário
     return { finalWmm, finalHmm, paperWmm: pw, paperHmm: ph, overlapMM, dpi, marginMM };
   }
 
@@ -668,7 +733,24 @@
     gridPreview.innerHTML = '';
     q('#dlLink').classList.remove('show');
 
+    const warnBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+
+    try {
+
     const p = getParams();
+
+    if (!p.finalWmm || !p.finalHmm || p.finalWmm <= 0 || p.finalHmm <= 0) {
+      progress.textContent = 'Preencha a largura e a altura final do pôster com valores maiores que zero.';
+      btn.disabled = false;
+      return;
+    }
+    if (!p.paperWmm || !p.paperHmm || p.paperWmm <= 0 || p.paperHmm <= 0) {
+      progress.textContent = 'Tamanho do papel inválido. Verifique o campo de papel da impressora.';
+      btn.disabled = false;
+      return;
+    }
+
     const g = computeGrid(p);
 
     progress.textContent = 'Renderizando em alta resolução...';
@@ -785,6 +867,9 @@
     bigCanvas.height = cropH;
     bigCanvas.getContext('2d').drawImage(fullCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
     const bigW = cropW, bigH = cropH;
+    // fullCanvas não é mais necessário — libera a memória (pode ser grande em DPIs altos)
+    fullCanvas.width = 0;
+    fullCanvas.height = 0;
 
     // outScale: fator de conversão render-space → output-space
     // safetyFactor == 1 → outScale=1; se bigCanvas foi reduzido → outScale>1
@@ -891,13 +976,21 @@
               marginOut, marginOut, dstAvailW, dstAvailH);
           }
 
-          // Borda e marcas da área de conteúdo
-          ctx.strokeStyle = '#999999';
-          ctx.lineWidth = Math.max(1, mm2pxOut(0.25));
+          // Linha de corte — bem discreta (tracejada e clara), só um guia leve.
+          // Fica suave de propósito: ela não deve "competir" com as marcas de
+          // registro nem ficar visível como uma borda dura na hora de sobrepor.
+          ctx.save();
+          ctx.setLineDash([mm2pxOut(1.6), mm2pxOut(1.4)]);
+          ctx.strokeStyle = 'rgba(150,146,136,0.38)';
+          ctx.lineWidth = Math.max(1, mm2pxOut(0.18));
           ctx.strokeRect(marginOut, marginOut, contentOutW, contentOutH);
+          ctx.restore();
 
+          // Marcas de registro (cruz) nos 4 cantos — estas são o que garante
+          // o encaixe exato entre folhas vizinhas. Mantidas firmes e nítidas,
+          // com um pequeno ponto central para mira precisa sob luz/transparência.
           const tickLen = mm2pxOut(5);
-          ctx.strokeStyle = '#777777';
+          ctx.strokeStyle = '#5b5b5b';
           ctx.lineWidth = Math.max(1, mm2pxOut(0.35));
           [[marginOut, marginOut],
            [marginOut + contentOutW, marginOut],
@@ -907,6 +1000,11 @@
             ctx.moveTo(cx - tickLen, cy); ctx.lineTo(cx + tickLen, cy);
             ctx.moveTo(cx, cy - tickLen); ctx.lineTo(cx, cy + tickLen);
             ctx.stroke();
+            // ponto central de mira
+            ctx.beginPath();
+            ctx.arc(cx, cy, Math.max(1, mm2pxOut(0.35)), 0, Math.PI * 2);
+            ctx.fillStyle = '#5b5b5b';
+            ctx.fill();
           });
 
           // Label discreto no canto superior esquerdo — sem fundo, só texto fino
@@ -925,9 +1023,9 @@
           }
         }
 
-        const dataUrl = tileCanvas.toDataURL('image/png');
+        const dataUrl = tileCanvas.toDataURL('image/jpeg', 0.92);
         if (!first) pdf.addPage([p.paperWmm, p.paperHmm], orientation);
-        pdf.addImage(dataUrl, 'PNG', 0, 0, p.paperWmm, p.paperHmm);
+        pdf.addImage(dataUrl, 'JPEG', 0, 0, p.paperWmm, p.paperHmm);
         first = false;
 
         const thumb = document.createElement('div');
@@ -941,14 +1039,29 @@
         thumb.appendChild(thumbImg);
         thumb.appendChild(thumbLabel);
         gridPreview.appendChild(thumb);
+
+        // tileCanvas já foi convertido para imagem — libera memória antes da próxima folha
+        tileCanvas.width = 0;
+        tileCanvas.height = 0;
       }
     }
+
+    // Canvases grandes não são mais necessários
+    bigCanvas.width = 0; bigCanvas.height = 0;
+    if (layoutCanvas) { layoutCanvas.width = 0; layoutCanvas.height = 0; }
 
     progress.textContent = `Pronto! ${rows * cols} folhas geradas.`;
     const blob = pdf.output('blob');
     q('#dlLink').href = URL.createObjectURL(blob);
     q('#dlLink').classList.add('show');
     btn.disabled = false;
+    } catch (err) {
+      console.error('Erro ao gerar o PDF:', err);
+      progress.textContent = 'Não foi possível gerar o PDF. Tente um DPI menor ou um pôster com menos folhas — o navegador pode ter atingido o limite de memória.';
+      btn.disabled = false;
+    } finally {
+      window.removeEventListener('beforeunload', warnBeforeUnload);
+    }
   }
 
   updateSummary();
